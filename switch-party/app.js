@@ -13,7 +13,7 @@ const player=id=>s.players.find(p=>p.id===id);
 const game=id=>G.find(g=>g.id===id);
 const factor=index=>(s.scoring==='ascending'?(index+1):1);
 const posPoints=(rank,index)=>(s.count-1-rank)*factor(index);
-const gameMode=g=>g?.mode==='team'&&s.count===4?'team':g?.mode==='duels'&&s.count===3?'roundrobin':g?.mode==='duels'&&s.count===4?'knockout':'ranking';
+const gameMode=g=>g?.mode==='team'&&s.count===4?'team':(g?.mode==='team'||g?.mode==='duels')&&s.count===3?'roundrobin':g?.mode==='duels'&&s.count===4?'pairduels':'ranking';
 const fullPoints=index=>(s.count-1)*factor(index);
 const blankPoints=()=>Object.fromEntries(s.players.map(p=>[p.id,0]));
 function seededMatch(){
@@ -22,9 +22,9 @@ function seededMatch(){
  const ids=shuffle(s.players.map(p=>p.id));
  if(mode==='team')return {mode,teams:[ids.slice(0,2),ids.slice(2,4)],winner:null};
  if(mode==='roundrobin')return {mode,pairs:[[ids[0],ids[1]],[ids[0],ids[2]],[ids[1],ids[2]]],winners:[]};
- return {mode,pairs:[[ids[0],ids[1]],[ids[2],ids[3]]],winners:[],finalWinner:null};
+ return {mode,pairs:[[ids[0],ids[1]],[ids[2],ids[3]]],winners:[]};
 }
-function ensureMatch(){if(!s.match||s.match.gameId!==s.sequence[s.rounds.length]){s.match={...seededMatch(),gameId:s.sequence[s.rounds.length]};save()}return s.match}
+function ensureMatch(){if(!s.match||s.match.gameId!==s.sequence[s.rounds.length]||s.match.mode!==gameMode(game(s.sequence[s.rounds.length]))){s.match={...seededMatch(),gameId:s.sequence[s.rounds.length]};save()}return s.match}
 
 const totals=()=>{const out=blankPoints();s.rounds.forEach((r,i)=>{
  if(r.points){Object.entries(r.points).forEach(([id,v])=>{if(id in out)out[id]+=v})}
@@ -59,22 +59,20 @@ function specialInput(m,idx){
  <div class="team-options">${m.teams.map((team,i)=>`<button class="team-choice ${m.winner===i?'chosen':''}" data-team="${i}"><span>TEAM ${i+1}</span><div>${team.map(id=>`<span class="team-member">${circle(player(id))}${esc(player(id)?.name)}</span>`).join('')}</div>${m.winner===i?'✓ Winners':''}</button>`).join('')}</div>`;
  }
  if(m.mode==='roundrobin'){
- return `<div class="mode-hint">Round robin: each person plays twice. Record the winner of all three matches. Each match win earns <strong>${mult} point${mult===1?'':'s'}</strong> (maximum ${max}).</div>
+ return `<div class="mode-hint">Everyone plays everyone once (three 1v1 matches). Record each winner. Ranking is based on match wins: 2 / 1 / 0 wins earn ${2*mult} / ${mult} / 0 points. If all players win once, everyone gets ${mult} point${mult===1?'':'s'}.</div>
  ${m.pairs.map((pair,i)=>singleMatchButtons(pair,m.winners[i],`Match ${i+1}`,i)).join('')}`;
  }
- if(m.mode==='knockout'){
- const ready=Boolean(m.winners[0]&&m.winners[1]);
- return `<div class="mode-hint">Random knockout · Two semifinals, then a final. Champion: <strong>${max} points</strong>; runner-up: <strong>${2*mult} points</strong>; semifinal losers: 0.</div>
- ${m.pairs.map((pair,i)=>singleMatchButtons(pair,m.winners[i],`Semifinal ${i+1}`,i)).join('')}
- ${ready?singleMatchButtons([m.winners[0],m.winners[1]],m.finalWinner,'Final',2):'<p class="small">The final unlocks when both semifinal winners are chosen.</p>'}`;
+ if(m.mode==='pairduels'){
+ return `<div class="mode-hint">Two separate random 1v1 matches, not teams. Select one winner from each match. Both winners independently receive <strong>${max} points</strong>, both losers 0. No final.</div>
+ ${m.pairs.map((pair,i)=>singleMatchButtons(pair,m.winners[i],`Match ${i+1}`,i)).join('')}`;
  }
  return '';
 }
-function canFinish(m){return m.mode==='ranking'?s.picks.length===s.count-1:m.mode==='team'?m.winner!==null:m.mode==='roundrobin'?m.pairs.every((_,i)=>Boolean(m.winners[i])):m.mode==='knockout'?Boolean(m.winners[0]&&m.winners[1]&&m.finalWinner):false}
+function canFinish(m){return m.mode==='ranking'?s.picks.length===s.count-1:m.mode==='team'?m.winner!==null:m.mode==='roundrobin'?m.pairs.every((_,i)=>Boolean(m.winners[i])):m.mode==='pairduels'?m.pairs.every((_,i)=>Boolean(m.winners[i])):false}
 function activeScreen(){
  const idx=s.rounds.length;if(idx>=s.sequence.length){finishScreen();return}
  const g=game(s.sequence[idx]),m=ensureMatch(),base=fullPoints(idx);
- const title=m.mode==='ranking'?'Enter finishing positions':m.mode==='team'?'Choose the winning team':m.mode==='roundrobin'?'Enter match winners':'Record knockout results';
+ const title=m.mode==='ranking'?'Enter finishing positions':m.mode==='team'?'Choose the winning team':m.mode==='roundrobin'?'Enter match winners':'Choose the two match winners';
  shell(`<section class="surface">${tracker()}<hr class="divider">${leaderboard()}<hr class="divider">
  <div class="between"><div class="eyebrow">NOW PLAYING · GAME ${idx+1} OF ${s.sequence.length}</div><span class="chip">ROUND ${idx+1}</span></div>
  <div class="current-game">${img(g)}<div><div class="muted small">CURRENT GAME</div><h2>${esc(g?.name||'Game')}</h2><div class="points-callout">${base} MAX POINT${base===1?'':'S'}</div></div></div>
@@ -105,11 +103,17 @@ function finishGame(){
  } else if(m.mode==='team'){
   winners=[...m.teams[m.winner]];winners.forEach(id=>pts[id]=fullPoints(idx));
  } else if(m.mode==='roundrobin'){
-  const winCount=Object.fromEntries(s.players.map(p=>[p.id,0]));m.winners.forEach(id=>winCount[id]++);
-  Object.keys(pts).forEach(id=>pts[id]=winCount[id]*factor(idx));const high=Math.max(...Object.values(winCount));winners=s.players.filter(p=>winCount[p.id]===high).map(p=>p.id);
- } else if(m.mode==='knockout'){
-  const finalist=m.winners.find(id=>id!==m.finalWinner);
-  pts[m.finalWinner]=fullPoints(idx);pts[finalist]=2*factor(idx);winners=[m.finalWinner];
+  const winCount=Object.fromEntries(s.players.map(p=>[p.id,0]));
+  m.winners.forEach(id=>winCount[id]++);
+  // Three games imply either 2/1/0 or 1/1/1 wins.
+  // A 1/1/1 tie shares the three placement rewards evenly (1 per player).
+  Object.keys(pts).forEach(id=>pts[id]=winCount[id]*factor(idx));
+  const high=Math.max(...Object.values(winCount));
+  winners=s.players.filter(p=>winCount[p.id]===high).map(p=>p.id);
+  ranking=s.players.map(p=>p.id).sort((a,b)=>winCount[b]-winCount[a]);
+ } else if(m.mode==='pairduels'){
+  winners=[...m.winners];
+  winners.forEach(id=>pts[id]=fullPoints(idx));
  }
  s.rounds.push({mode:m.mode,ranking,winners,points:pts,details:JSON.parse(JSON.stringify(m))});
  s.picks=[];s.match=null;
@@ -139,10 +143,8 @@ if(target.dataset.team!==undefined){const m=ensureMatch();if(m.mode==='team'){m.
 if(target.dataset.match!==undefined){
  const m=ensureMatch(),i=Number(target.dataset.match),id=target.dataset.winner;
  if(m.mode==='roundrobin'&&m.pairs[i]?.includes(id)){m.winners[i]=id;render();return}
- if(m.mode==='knockout'){
-  if(i<2&&m.pairs[i]?.includes(id)){m.winners[i]=id;m.finalWinner=null;render();return}
-  if(i===2&&m.winners[0]&&m.winners[1]&&m.winners.includes(id)){m.finalWinner=id;render();return}
- }return;
+ if(m.mode==='pairduels'&&m.pairs[i]?.includes(id)){m.winners[i]=id;render();return}
+ return;
 }
 if(target.dataset.pick){if(s.picks.length<s.count-1&&!s.picks.includes(target.dataset.pick)){s.picks.push(target.dataset.pick);render()}return}
 if(target.dataset.unpick!==undefined){s.picks=s.picks.slice(0,Number(target.dataset.unpick));render();return}
