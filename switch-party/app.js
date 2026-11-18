@@ -3,7 +3,7 @@ const $=id=>document.getElementById(id), G=window.SWITCH_GAMES||[];
 const COLORS=['#F18A9C','#F3B369','#F4D65F','#79D9A0','#62CDDA','#7EA9F5','#B28AF2','#E888C9'];
 const KEY='switch-party-tournament-v1';
 const makePlayers=n=>Array.from({length:n},(_,i)=>({id:'p'+i,name:'',color:i%COLORS.length}));
-const defaults=()=>({screen:'home',count:2,playerStep:0,players:makePlayers(2),selected:[],order:'random',scoring:'fixed',sequence:[],rounds:[],picks:[],match:null,history:[]});
+const defaults=()=>({screen:'home',count:2,playerStep:0,players:makePlayers(2),selected:[],order:'random',scoring:'fixed',sequence:[],rounds:[],picks:[],ties:[],match:null,history:[]});
 let s=defaults();
 try{const raw=JSON.parse(localStorage.getItem(KEY));if(raw&&typeof raw==='object'&&Array.isArray(raw.players)&&Array.isArray(raw.history))s={...defaults(),...raw};}catch{}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(s))}catch(e){console.warn('Cannot save local data',e)}};
@@ -13,6 +13,28 @@ const player=id=>s.players.find(p=>p.id===id);
 const game=id=>G.find(g=>g.id===id);
 const factor=index=>(s.scoring==='ascending'?(index+1):1);
 const posPoints=(rank,index)=>(s.count-1-rank)*factor(index);
+const formatPoints=n=>Number(n.toFixed(4)).toLocaleString('en-US',{maximumFractionDigits:2});
+// A tie is recorded by the 0-based position that shares the preceding rank.
+function placementPoints(ties,index){
+ const output=[];let start=0;
+ for(let i=1;i<=s.count;i++){
+  if(i<s.count&&(ties||[]).includes(i))continue;
+  const mean=Array.from({length:i-start},(_,j)=>posPoints(start+j,index)).reduce((a,b)=>a+b,0)/(i-start);
+  for(let j=start;j<i;j++)output[j]=mean;
+  start=i;
+ }
+ return output;
+}
+function placementLabels(ties){
+ const labels=[];let start=0;
+ for(let i=1;i<=s.count;i++){
+  if(i<s.count&&(ties||[]).includes(i))continue;
+  for(let j=start;j<i;j++)labels[j]={rank:start+1,tied:i-start>1};
+  start=i;
+ }
+ return labels;
+}
+
 const gameMode=g=>g?.mode==='team'&&s.count===4?'team':(g?.mode==='team'||g?.mode==='duels')&&s.count===3?'roundrobin':g?.mode==='duels'&&s.count===4?'pairduels':'ranking';
 const fullPoints=index=>(s.count-1)*factor(index);
 const blankPoints=()=>Object.fromEntries(s.players.map(p=>[p.id,0]));
@@ -44,15 +66,34 @@ function playersScreen(){const p=s.players[s.playerStep];const used=new Set(s.pl
 function gamesScreen(){const available=G.filter(g=>g.players.includes(s.count));const validIds=available.map(g=>g.id);const all=validIds.length>0&&validIds.every(id=>s.selected.includes(id));shell(`<section class="surface">${steps(1)}<div class="section-head"><div><div class="eyebrow">Choose your lineup</div><h2>Select games</h2></div><span class="chip">${s.selected.length} selected</span></div><p class="small">Only sports supporting ${s.count} players can be selected. Colored covers are selected; unavailable games have a red ×.</p><div class="game-grid">${G.map(g=>{const valid=g.players.includes(s.count),selected=s.selected.includes(g.id);return `<button class="game-option ${selected?'selected':''} ${valid?'':'unavailable'}" data-game="${esc(g.id)}" ${valid?'':'disabled'} aria-pressed="${selected}"><div class="game-img-wrap">${img(g)}${!valid?'<span class="x-overlay">×</span>':selected?'<span class="check-overlay">✓</span>':''}</div><div class="game-label">${esc(g.name)}</div></button>`}).join('')}</div><div class="buttonrow">${btn(all?'Deselect all':'Select all available','select-all','secondary flex')}${btn('← Players','back-players','ghost')}${btn('Next →','to-rules','flex')}</div>${s.selected.length?'':'<p class="notice">Select at least one game to continue.</p>'}</section>`,'SETUP')}
 function option(name,val,heading,sub,current){return `<label class="option-block"><input type="radio" name="${name}" value="${val}" ${current===val?'checked':''}><span class="option-card"><span class="radioicon"></span><span><span class="option-title">${heading}</span><div class="option-sub">${sub}</div></span></span></label>`}
 function rulesScreen(){shell(`<section class="surface">${steps(2)}<div class="eyebrow">Almost ready</div><h2>Tournament rules</h2><div class="subhead">Game order</div>${option('order','random','Random','Automatically shuffle all selected games.',s.order)}${option('order','manual','Manual','Use the arrows to choose the exact sequence.',s.order)}${s.order==='manual'?`<div class="order-list">${s.selected.map((id,i)=>`<div class="order-row">${img(game(id))}<div class="name">${i+1}. ${esc(game(id)?.name||id)}</div><button data-move="${i}:-1" ${i===0?'disabled':''} aria-label="Move up">↑</button><button data-move="${i}:1" ${i===s.selected.length-1?'disabled':''} aria-label="Move down">↓</button></div>`).join('')}</div>`:''}<div class="subhead">Scoring system</div>${option('scoring','fixed','Fixed points',`${s.count} players: ${Array.from({length:s.count},(_,i)=>s.count-i-1).join(' / ')} points in every game.`,s.scoring)}${option('scoring','ascending','Ascending points','Game 1 ×1, Game 2 ×2, Game 3 ×3, etc. Points scale by finishing position.',s.scoring)}<div class="buttonrow" style="margin-top:23px">${btn('← Games','back-games','secondary')}${btn('▶ Start tournament','start','flex')}</div></section>`,'SETUP')}
-function tracker(){const max=s.sequence.length,visible=Math.min(s.rounds.length+1,max);return `<div class="between"><div class="subhead" style="margin:0">Game history</div><span class="muted small">${s.rounds.length} / ${max} completed</span></div><div class="tracker">${s.sequence.slice(0,visible).map((id,i)=>{const g=game(id),r=s.rounds[i];const color=r?hexFor(r.winners?.[0]||r.ranking?.[0]):'transparent';const border=r&&r.winners?.length>1?`border-top-color:${hexFor(r.winners[0])};border-left-color:${hexFor(r.winners[0])};border-bottom-color:${hexFor(r.winners[1])};border-right-color:${hexFor(r.winners[1])}`:`border-color:${color}`;return `<div title="${esc(g?.name||id)}${r?' — Winner(s): '+esc((r.winners||[r.ranking?.[0]]).map(id=>player(id)?.name).join(' & ')):''}"><div class="tracker-icon ${r?'finished':''}" style="${border}">${img(g)}</div><div class="tracker-label">${i+1}</div></div>`}).join('')}</div>`}
-function leaderboard(){const pts=totals();return `<div class="between"><div class="subhead" style="margin:0">Standings</div><span class="muted small">Live points</span></div><div class="leaderboard" style="--players:${s.count}">${leaders().map((p,i)=>`<div class="score-card"><div class="score-color" style="background:${COLORS[p.color]}"></div><div class="score-name">${i+1}. ${esc(p.name)}</div><div class="score-points">${pts[p.id]}</div><div class="score-rank">POINTS</div></div>`).join('')}</div>`}
+function tracker(){
+ const max=s.sequence.length,visible=Math.min(s.rounds.length+1,max);
+ return `<div class="between"><div class="subhead" style="margin:0">Game history</div><span class="muted small">${s.rounds.length} / ${max} completed</span></div><div class="tracker">${s.sequence.slice(0,visible).map((id,i)=>{
+  const g=game(id),r=s.rounds[i],ids=[...new Set(r?.winners||[])];
+  const hues=ids.map(hexFor);
+  const border=!r?'':hues.length>1?`border-color:transparent;background:conic-gradient(${hues.map((c,j)=>`${c} ${j*100/hues.length}% ${(j+1)*100/hues.length}%`).join(',')})`:`border-color:${hues[0]||'transparent'}`;
+  const winnerNames=ids.map(id=>player(id)?.name).filter(Boolean).join(' & ');
+  return `<div title="${esc(g?.name||id)}${r?' — Winner(s): '+esc(winnerNames):''}"><div class="tracker-icon ${r?'finished':''}" style="${border}">${img(g)}</div><div class="tracker-label">${i+1}</div></div>`;
+ }).join('')}</div>`
+}
+function leaderboard(){const pts=totals();return `<div class="between"><div class="subhead" style="margin:0">Standings</div><span class="muted small">Live points</span></div><div class="leaderboard" style="--players:${s.count}">${leaders().map((p,i)=>`<div class="score-card"><div class="score-color" style="background:${COLORS[p.color]}"></div><div class="score-name">${i+1}. ${esc(p.name)}</div><div class="score-points">${formatPoints(pts[p.id])}</div><div class="score-rank">POINTS</div></div>`).join('')}</div>`}
 function startingOrder(){
  const pts=totals();
  // Lowest score starts, highest score goes last. Ties keep player entry order.
  const order=[...s.players].sort((a,b)=>pts[a.id]-pts[b.id]||s.players.indexOf(a)-s.players.indexOf(b));
  return `<div class="starting-order"><div class="subhead">Starting order</div><div class="starting-order-list">${order.map((p,i)=>`<div class="starting-order-player"><span class="starting-number">${i+1}</span>${circle(p)}<span>${esc(p.name)}</span></div>`).join('')}</div></div>`;
 }
-function rankEntry(rank){const p=s.picks[rank],available=s.players.filter(x=>!s.picks.includes(x.id)),auto=rank===s.count-1&&s.picks.length===s.count-1,chosen=auto?available[0]?.id:p;const value=posPoints(rank,s.rounds.length);return `<div class="rank-row"><div class="rank-label">${rank===0?'🥇':rank===1?'🥈':rank===2?'🥉':'④'} ${rank+1}${rank===0?'st':rank===1?'nd':rank===2?'rd':'th'}</div><div>${chosen?`<button class="rank-filled" data-unpick="${rank}" ${auto?'disabled':''}>${circle(player(chosen))}<span>${esc(player(chosen)?.name)}</span><span>+${value} pt${value===1?'':'s'}</span>${auto?'':' ×'}</button>`:rank===s.picks.length?`<div class="rank-options">${available.map(x=>`<button class="rank-choice" data-pick="${esc(x.id)}">${circle(x)}${esc(x.name)}</button>`).join('')}</div>`:'<div class="rank-unfilled">Choose the previous position first</div>'}</div></div>`}
+function rankEntry(position){
+ const chosenId=s.picks[position],available=s.players.filter(x=>!s.picks.includes(x.id));
+ const auto=position===s.count-1&&s.picks.length===s.count-1;
+ const id=auto?available[0]?.id:chosenId;
+ const labels=placementLabels(s.ties||[]),v=placementPoints(s.ties||[],s.rounds.length)[position];
+ const label=labels[position];
+ const suffix=n=>n===1?'st':n===2?'nd':n===3?'rd':'th';
+ const place=label.tied?`Tied ${label.rank}${suffix(label.rank)}`:`${label.rank}${suffix(label.rank)}`;
+ const controls=id&&position>0?`<button type="button" data-tie="${position}" class="tie-toggle ${(s.ties||[]).includes(position)?'selected':''}" aria-pressed="${(s.ties||[]).includes(position)}">${(s.ties||[]).includes(position)?'✓ Tied with previous':'= Tie with previous'}</button>`:'';
+ return `<div class="rank-row"><div class="rank-label">${position===0?'🥇':position===1?'🥈':position===2?'🥉':'④'} ${place}</div><div class="rank-cell">${id?`<button class="rank-filled" data-unpick="${position}" ${auto?'disabled':''}>${circle(player(id))}<span>${esc(player(id)?.name)}</span><span>+${formatPoints(v)} pt${v===1?'':'s'}</span>${auto?'':' ×'}</button>`:position===s.picks.length?`<div class="rank-options">${available.map(x=>`<button class="rank-choice" data-pick="${esc(x.id)}">${circle(x)}${esc(x.name)}</button>`).join('')}</div>`:'<div class="rank-unfilled">Choose the previous position first</div>'}${controls}</div></div>`;
+}
 function singleMatchButtons(pair,chosen,kind,index){
  return `<div class="match-row"><div class="match-label">${esc(kind)}</div><div class="match-buttons">${pair.map(id=>{
  const p=player(id);return `<button class="match-choice ${chosen===id?'chosen':''}" data-match="${index}" data-winner="${esc(id)}" ${chosen&&chosen!==id?'':' '}>${circle(p)} ${esc(p?.name)} ${chosen===id?'✓':''}</button>`;
@@ -81,9 +122,9 @@ function activeScreen(){
  const title=m.mode==='ranking'?'Enter finishing positions':m.mode==='team'?'Choose the winning team':m.mode==='roundrobin'?'Enter match winners':'Choose the two match winners';
  shell(`<section class="surface">${tracker()}<hr class="divider">${leaderboard()}<hr class="divider">
  <div class="between"><div class="eyebrow">NOW PLAYING · GAME ${idx+1} OF ${s.sequence.length}</div><span class="chip">ROUND ${idx+1}</span></div>
- <div class="current-game">${img(g)}<div><div class="muted small">CURRENT GAME</div><h2>${esc(g?.name||'Game')}</h2><div class="points-callout">${base} POINT${base===1?'':'S'}</div></div></div>
+ <div class="current-game"><span class="now-playing-marker">NOW PLAYING</span>${img(g)}<div><div class="muted small">CURRENT GAME</div><h2>${esc(g?.name||'Game')}</h2><div class="points-callout">${base} POINT${base===1?'':'S'}</div></div></div>
  ${startingOrder()}<div class="subhead">${title}</div>
- ${m.mode==='ranking'?`<p class="small" style="margin-top:3px">Select players in finishing order. The last player is assigned automatically.</p><div class="rank-list">${Array.from({length:s.count},(_,i)=>rankEntry(i)).join('')}</div>`:specialInput(m,idx)}
+ ${m.mode==='ranking'?`<p class="small" style="margin-top:3px">Select players in finishing order. To share a position, tap “Tie with previous”. The last player is assigned automatically.</p><div class="rank-list">${Array.from({length:s.count},(_,i)=>rankEntry(i)).join('')}</div>`:specialInput(m,idx)}
  <div class="buttonrow">${btn('✓ Finish game','finish','full')}${m.mode==='ranking'?btn('Reset selections','reset-picks','secondary flex'):''}${s.rounds.length?btn('↶ Undo last result','undo','ghost flex'):''}</div>
  <div class="exit-row">${btn('End tournament','end-tournament','danger smallbtn')}</div></section>`,'PLAYING')
 }
@@ -105,7 +146,11 @@ function finishGame(){
  const pts=blankPoints();let winners=[];let ranking=[];
  if(m.mode==='ranking'){
   const last=s.players.find(p=>!s.picks.includes(p.id));if(!last)return;
-  ranking=[...s.picks,last.id];ranking.forEach((id,i)=>pts[id]=posPoints(i,idx));winners=[ranking[0]];
+  ranking=[...s.picks,last.id];
+  const shares=placementPoints(s.ties||[],idx);
+  ranking.forEach((id,i)=>pts[id]=shares[i]);
+  const best=Math.max(...Object.values(pts));
+  winners=ranking.filter(id=>Math.abs(pts[id]-best)<1e-9);
  } else if(m.mode==='team'){
   winners=[...m.teams[m.winner]];winners.forEach(id=>pts[id]=fullPoints(idx));
  } else if(m.mode==='roundrobin'){
@@ -121,8 +166,8 @@ function finishGame(){
   winners=[...m.winners];
   winners.forEach(id=>pts[id]=fullPoints(idx));
  }
- s.rounds.push({mode:m.mode,ranking,winners,points:pts,details:JSON.parse(JSON.stringify(m))});
- s.picks=[];s.match=null;
+ s.rounds.push({mode:m.mode,ranking,winners,points:pts,ties:m.mode==='ranking'?[...(s.ties||[])]:[],details:JSON.parse(JSON.stringify(m))});
+ s.picks=[];s.ties=[];s.match=null;
  if(s.rounds.length===s.sequence.length){archiveTournament('completed');s.screen='finished'}
  render();
 }
@@ -135,7 +180,7 @@ function undo(){
  if(!s.rounds.length)return;
  if(!confirm('Undo the last completed game?'))return;
  if(s.screen==='finished'&&s.history.length)s.history.shift();
- const last=s.rounds.pop();s.picks=last.mode==='ranking'?last.ranking.slice(0,s.count-1):[];
+ const last=s.rounds.pop();s.picks=last.mode==='ranking'?last.ranking.slice(0,s.count-1):[];s.ties=last.ties||[];
  s.match=last.details||null;s.screen='playing';render();
 }
 $('app').addEventListener('input',e=>{if(e.target.id==='player-name'){s.players[s.playerStep].name=e.target.value;save()}});
@@ -152,15 +197,16 @@ if(target.dataset.match!==undefined){
  if(m.mode==='pairduels'&&m.pairs[i]?.includes(id)){m.winners[i]=id;render();return}
  return;
 }
+if(target.dataset.tie!==undefined){const i=Number(target.dataset.tie);if(i>0&&i<s.count&&(s.picks[i]||i===s.count-1&&s.picks.length===s.count-1)){s.ties=s.ties||[];s.ties=s.ties.includes(i)?s.ties.filter(x=>x!==i):[...s.ties,i];render()}return}
 if(target.dataset.pick){if(s.picks.length<s.count-1&&!s.picks.includes(target.dataset.pick)){s.picks.push(target.dataset.pick);render()}return}
-if(target.dataset.unpick!==undefined){s.picks=s.picks.slice(0,Number(target.dataset.unpick));render();return}
+if(target.dataset.unpick!==undefined){s.picks=s.picks.slice(0,Number(target.dataset.unpick));s.ties=(s.ties||[]).filter(i=>i<=s.picks.length);render();return}
 switch(target.dataset.action){case 'new':restart();break;case 'continue':s.screen=s.rounds.length===s.sequence.length?'finished':'playing';render();break;case 'history':s.screen='history';render();break;case 'home':toHome();break;case 'previous-player':s.playerStep=Math.max(0,s.playerStep-1);render();break;case 'next-player':{const p=s.players[s.playerStep];p.name=p.name.trim();if(!p.name)return alert('Enter a player name.');if(s.players.some((x,i)=>i!==s.playerStep&&x.name.trim().toLocaleLowerCase()===p.name.toLocaleLowerCase()))return alert('Please use unique player names.');if(s.playerStep<s.count-1){s.playerStep++;const used=new Set(s.players.slice(0,s.playerStep).map(x=>x.color));if(used.has(s.players[s.playerStep].color))s.players[s.playerStep].color=COLORS.findIndex((_,i)=>!used.has(i));}else if(validNames())s.screen='games';else return alert('Enter a name for every player.');render();break}
 case 'back-players':s.screen='players';s.playerStep=s.count-1;render();break;
 case 'select-all':{const valid=G.filter(g=>g.players.includes(s.count)).map(g=>g.id);s.selected=valid.every(id=>s.selected.includes(id))?[]:valid;render();break}
 case 'to-rules':if(!s.selected.length)return alert('Select at least one game.');s.screen='rules';render();break;
 case 'back-games':s.screen='games';render();break;
-case 'start':if(!s.selected.length)return; s.sequence=s.order==='random'?shuffle([...s.selected]):[...s.selected];s.rounds=[];s.picks=[];s.match=null;s.screen='playing';render();break;
-case 'end-tournament':endTournament();break;case 'reset-picks':s.picks=[];render();break;case 'finish':finishGame();break;case 'undo':undo();break;
+case 'start':if(!s.selected.length)return; s.sequence=s.order==='random'?shuffle([...s.selected]):[...s.selected];s.rounds=[];s.picks=[];s.ties=[];s.match=null;s.screen='playing';render();break;
+case 'end-tournament':endTournament();break;case 'reset-picks':s.picks=[];s.ties=[];render();break;case 'finish':finishGame();break;case 'undo':undo();break;
 case 'clear-history':if(confirm('Permanently remove the past tournament history?')){s.history=[];render()}break;default:break}
 });
 render();
