@@ -1,0 +1,49 @@
+const CACHE_NAME = 'darts-suite-v46';
+const ASSETS = [
+  './',
+  './index.html',
+  './styles.css',
+  './app.js',
+  './mode-nav.css',
+  './cricket.html',
+  './cricket.css',
+  './cricket-addons.css','./cricket-addons.css?v=46',
+  './cricket.js','./cricket.js?v=46',
+  './501.html',
+  './501.css','./501.css?v=31',
+  './501.js','./501.js?v=31',
+  './foxhunt.html',
+  './foxhunt.css','./foxhunt.css?v=45',
+  './foxhunt.js','./foxhunt.js?v=45',
+  './manifest.json',
+  './icon.svg'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => Promise.all(
+      keys.filter((key) => key.startsWith('darts-suite-') && key !== CACHE_NAME).map((key) => caches.delete(key))
+    ))
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.registration.scope)) return;
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
+  );
+});

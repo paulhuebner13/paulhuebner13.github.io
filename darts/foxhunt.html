@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="foxhunt.css?v=45">
+  <link rel="stylesheet" href="mode-nav.css">
+  <title>Fuchsjagd</title>
+</head>
+<body>
+  <main class="fox-shell">
+    <div class="mode-topbar">
+      <nav class="mode-switch" aria-label="Spielmodus">
+        <a class="mode-pill" href="index.html">Around<br>the Clock</a>
+        <a class="mode-pill" href="cricket.html">Cricket</a>
+        <a class="mode-pill" href="501.html">501</a>
+        <a class="mode-pill active" href="foxhunt.html">Fuchsjagd</a>
+      </nav>
+      <button id="themeToggle" class="icon-button" type="button" aria-label="Theme wechseln">◐</button>
+    </div>
+
+    <section id="setupView" class="screen active">
+      <div class="compact-title-row">
+        <h1>Fuchsjagd</h1>
+      </div>
+
+      <article class="card">
+        <div class="section-title">Spieler</div>
+        <div id="profiles" class="profile-list"></div>
+      </article>
+
+      <article class="card">
+        <div class="section-title">Fuchs</div>
+        <div id="lineup" class="lineup"></div>
+      </article>
+
+      <div class="setup-bottom-row">
+        <div class="segmented" id="variantPicker">
+          <button type="button" data-variant="segment">Segment</button>
+          <button type="button" data-variant="double" class="active">Double</button>
+          <button type="button" data-variant="triple">Triple</button>
+        </div>
+        <button id="startBtn" class="primary start-button" type="button" disabled>Start</button>
+      </div>
+
+      <p id="setupMessage" class="setup-message"></p>
+
+      <article class="card history-card">
+        <div class="section-heading-row">
+          <div class="section-title">Verlauf</div>
+          <button id="clearHistoryBtn" class="quiet tiny-action" type="button">Verlauf löschen</button>
+        </div>
+        <div id="history" class="history empty">Noch kein Spiel.</div>
+      </article>
+
+      <article class="card stats-card">
+        <div class="section-title">Statistik</div>
+        <div id="foxStats" class="fox-stats"></div>
+      </article>
+    </section>
+
+    <section id="gameView" class="screen">
+      <div class="game-header">
+        <button id="backSetupBtn" class="secondary small" type="button">Setup</button>
+      </div>
+
+      <div id="versusBoard" class="versus-board"></div>
+
+      <div class="hunt-ring-wrap">
+        <div id="huntRing" class="hunt-ring" aria-label="Positionen auf dem Dartboard"></div>
+        <div class="hunt-ring-center">
+          <strong id="distanceNumber">0</strong>
+          <span>Felder</span>
+        </div>
+      </div>
+
+      <div class="visit-input">
+        <div id="hitCountPicker" class="hit-count-picker" aria-label="Treffer in diesem Zug">
+          <button type="button" data-hits="1"><span>1</span></button>
+          <button type="button" data-hits="2"><span>2</span></button>
+          <button type="button" data-hits="3"><span>3</span></button>
+        </div>
+        <button id="continueBtn" class="primary continue-button" type="button">Weiter</button>
+      </div>
+
+      <button id="undoBtn" class="quiet undo-button" type="button">↶</button>
+    </section>
+  </main>
+
+  <dialog id="winDialog">
+    <div class="dialog-card">
+      <h2 id="winTitle">Spiel beendet</h2>
+      <p id="winText"></p>
+      <button id="rematchBtn" class="primary full" type="button">Revanche</button>
+      <button id="dialogSetupBtn" class="secondary full" type="button">Setup</button>
+    </div>
+  </dialog>
+
+  <script src="supabase-config.js"></script>
+  <script src="foxhunt.js?v=45"></script>
+</body>
+</html>

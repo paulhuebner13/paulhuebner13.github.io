@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="description" content="Darts Cricket für menschliche Spieler und Bots." />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="cricket.css?v=20" />
+  <link rel="stylesheet" href="mode-nav.css" />
+  <link rel="stylesheet" href="cricket-addons.css?v=46" />
+  <title>Darts Cricket</title>
+</head>
+<body>
+  <div class="cricket-shell">
+    <header class="mode-topbar">
+      <nav class="mode-switch" aria-label="Spielmodus">
+        <a class="mode-pill" href="index.html">Around the Clock</a>
+        <a class="mode-pill active" href="cricket.html">Cricket</a>
+        <a class="mode-pill" href="501.html">501</a>
+        <a class="mode-pill" href="foxhunt.html">Fuchsjagd</a>
+      </nav>
+      <button id="themeToggle" class="icon-button" type="button" aria-label="Hell-/Dunkelmodus umschalten">◐</button>
+    </header>
+
+    <main>
+      <section id="setupView" class="screen active" aria-label="Cricket einrichten">
+        <article class="setup-card lineup-panel">
+          <div class="section-heading">
+            <h2>Teilnehmer</h2>
+            <span class="capacity-label"><span id="lineupCount">0</span> im Spiel</span>
+          </div>
+          <div id="selectedLineup" class="selected-lineup empty-copy">Noch niemand ausgewählt.</div>
+          <button id="startGameBtn" class="cta-button" type="button" disabled>Cricket starten</button>
+          <p id="setupMessage" class="form-message" role="status"></p>
+        </article>
+
+        <div class="setup-columns">
+          <article class="setup-card">
+            <div class="section-heading">
+              <h2>Menschen</h2>
+            </div>
+            <form id="createPlayerForm" class="create-player-form">
+              <label class="sr-only" for="playerNameInput">Name des Spielers</label>
+              <input id="playerNameInput" maxlength="24" autocomplete="off" placeholder="Neuer Name" />
+              <button class="small-primary" type="submit">+</button>
+            </form>
+            <div id="savedPlayers" class="saved-list"></div>
+          </article>
+
+          <article class="setup-card bot-panel">
+            <div class="section-heading">
+              <h2>Bot</h2>
+            </div>
+            <div class="bot-add-row">
+              <label class="sr-only" for="botDifficulty">Schwierigkeit</label>
+              <select id="botDifficulty">
+                <option value="rookie">Anfänger</option>
+                <option value="casual">Leicht</option>
+                <option value="normal" selected>Mittel</option>
+                <option value="strong">Schwer</option>
+                <option value="expert">Profi</option>
+              </select>
+              <button id="addBotBtn" class="small-primary bot-add-button" type="button">+</button>
+            </div>
+            <button id="addAllBotsBtn" class="quiet-button all-bots-button" type="button">Alle 5 Bots hinzufügen</button>
+
+            <div class="cricket-target-settings">
+              <div class="cricket-target-settings-head">
+                <span>Zahlen <b id="targetCount">6/6</b></span>
+                <div class="cricket-target-actions">
+                  <button id="resetTargetsBtn" class="target-reset-btn" type="button">15+</button>
+                  <button id="rangeTargetsBtn" class="target-reset-btn" type="button" aria-pressed="false">x+</button>
+                  <button id="clearTargetsBtn" class="target-reset-btn" type="button">Alle löschen</button>
+                </div>
+              </div>
+              <div id="cricketTargetPicker" class="cricket-target-picker" aria-label="Cricket Zahlen auswählen"></div>
+              <div class="cricket-target-note">genau 6 Zahlen + Bull</div>
+
+              <div class="bull-factor-row">
+                <label for="bullFactorSlider">Bull-Faktor</label>
+                <input id="bullFactorSlider" type="range" min="1" max="4" step="0.2" value="4">
+                <output id="bullFactorValue" for="bullFactorSlider">4</output>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <article class="setup-card player-stats-panel">
+          <div class="section-heading stats-heading">
+            <h2>Spielerstatistik</h2>
+            <label class="sr-only" for="statsPlayerSelect">Spieler auswählen</label>
+            <select id="statsPlayerSelect" class="stats-player-select"></select>
+          </div>
+          <div id="playerStats" class="player-stats empty-copy">Noch keine menschlichen Spieler gespeichert.</div>
+        </article>
+
+        <article class="setup-card online-comparison-panel">
+          <div class="section-heading">
+            <h2>Paul vs. Lukas</h2>
+          </div>
+          <div id="onlineStats" class="online-stats empty-copy">Supabase ist noch nicht eingerichtet.</div>
+        </article>
+
+
+<article id="historyPanel" class="setup-card history-panel">
+          <div class="section-heading">
+            <h2>Letzte Spiele</h2>
+            <button id="clearHistoryBtn" class="quiet-button danger-button" type="button">Cricket-History löschen</button>
+          </div>
+          <div id="cricketHistory" class="cricket-history empty-copy">Noch kein Spiel abgeschlossen.</div>
+        </article>
+      </section>
+
+      <section id="gameView" class="screen game-screen" aria-label="Cricket-Spiel">
+        <div class="game-toolbar">
+          <button id="backToSetupBtn" class="toolbar-button" type="button" aria-label="Zurück">←</button>
+          <div id="turnDots" class="turn-dots" aria-label="Würfe in dieser Aufnahme">
+            <span></span><span></span><span></span>
+          </div>
+          <button id="gameThemeToggle" class="toolbar-button" type="button" aria-label="Hell-/Dunkelmodus umschalten">◐</button>
+          <button id="undoDartBtn" class="toolbar-button" type="button" aria-label="Letzten Wurf zurück">↶</button>
+          <button id="resetGameBtn" class="toolbar-button danger-toolbar-button" type="button" aria-label="Spiel neu starten">↻</button>
+        </div>
+
+        <div id="scoreboardWrap" class="scoreboard-wrap" aria-label="Cricket-Scoreboard">
+          <table id="scoreboard" class="scoreboard"></table>
+        </div>
+
+        <div class="throw-area">
+          <div id="humanControls" class="human-controls">
+            <div id="targetButtons" class="target-button-grid"></div>
+            <div id="multiplierButtons" class="multiplier-grid" aria-label="Wurfart">
+              <button class="modifier-button" data-multiplier="2" type="button">Double</button>
+              <button class="modifier-button" data-multiplier="3" type="button">Triple</button>
+            </div>
+          </div>
+
+          <div id="botControls" class="bot-status" hidden aria-live="polite">
+            <span class="bot-loading-dot"></span>
+            <span>Bot wirft</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="winnerDialog" class="winner-dialog">
+    <div class="winner-content">
+      <div id="placementBadge" class="trophy-mark">PLATZ 1</div>
+      <h2 id="winnerTitle">Gewonnen!</h2>
+      <p id="winnerSummary"></p>
+      <div id="finalScores" class="final-scores"></div>
+      <div class="winner-actions">
+        <button id="continuePlacementBtn" class="cta-button continue-placement-button" type="button">Weiter spielen</button>
+        <button id="rematchBtn" class="outline-button" type="button">Revanche</button>
+        <button id="winnerSetupBtn" class="outline-button" type="button">Teilnehmer</button>
+      </div>
+    </div>
+  </dialog>
+
+
+  <dialog id="historyDetailDialog" class="winner-dialog history-detail-dialog">
+    <div class="winner-content history-detail-content">
+      <div class="history-detail-top">
+        <button id="historyPrevBtn" class="quiet-button" type="button">← Vorheriges</button>
+        <button id="historyNextBtn" class="quiet-button" type="button">Nächstes →</button>
+      </div>
+      <h2 id="historyDetailTitle">Spiel</h2>
+      <p id="historyDetailMeta" class="history-detail-meta"></p>
+      <div id="historyDetailRanking" class="history-detail-ranking"></div>
+      <button id="historyDetailCloseBtn" class="outline-button" type="button">Schließen</button>
+    </div>
+  </dialog>
+
+  <script src="supabase-config.js"></script>
+  <script src="cricket.js?v=46"></script>
+</body>
+</html>

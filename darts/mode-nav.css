@@ -1,0 +1,52 @@
+.mode-topbar{
+  width:100%;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:14px;
+}
+.mode-switch{
+  flex:1;
+  min-width:0;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:5px;
+  padding:4px;
+  border-radius:16px;
+  background:var(--card);
+  box-shadow:var(--shadow);
+}
+.mode-pill{
+  min-width:0;
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:6px 4px;
+  border-radius:12px;
+  color:var(--muted);
+  text-decoration:none;
+  font-size:.8rem;
+  line-height:1;
+  font-weight:800;
+  white-space:nowrap;
+}
+.mode-pill.active{background:var(--primary);color:#fff}
+.mode-topbar>.icon-button{flex:0 0 48px}
+@media(max-width:420px){.mode-pill{font-size:.7rem}.mode-topbar{gap:6px}}
+
+@media(max-width:420px){
+  .mode-pill{font-size:.61rem;padding:6px 2px}
+}
+
+/* v41: four modes fit cleanly; long labels may use two lines */
+.mode-switch{align-items:stretch}
+.mode-pill{
+  white-space:normal!important;
+  line-height:1.05!important;
+  text-align:center!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:38px;
+}
