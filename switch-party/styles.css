@@ -17,3 +17,16 @@
 .match-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .match-choice{display:flex;align-items:center;gap:7px;justify-content:center;min-width:0;overflow-wrap:anywhere;border:2px solid #53647f;border-radius:10px;background:#3a4a62;padding:12px 8px;color:white;font-weight:750;font-size:13px}
 @media(max-width:440px){.team-options{gap:7px}.team-choice{padding:10px}.match-choice{padding:9px 4px;font-size:12px}}
+
+/* v1.4 - larger game area, strong history borders, score-based starting order */
+.tracker-icon{border-width:5px;border-radius:12px}
+.current-game{grid-template-columns:145px 1fr;gap:22px;padding:21px;margin:20px 0}
+.current-game img{width:145px}
+.current-game h2{font-size:clamp(25px,5vw,36px)}
+.points-callout{font-size:clamp(23px,4.8vw,30px)}
+.starting-order{margin:20px 0 23px}
+.starting-order-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.starting-order-player{display:inline-flex;align-items:center;gap:8px;background:#303f59;border:1px solid #566886;border-radius:10px;padding:10px 12px;font-weight:800;font-size:13px}
+.starting-number{color:#afc6e4;font-size:12px}
+@media(max-width:520px){.tracker-icon{border-width:4px;border-radius:8px}.current-game{grid-template-columns:105px 1fr;gap:15px;padding:16px}.current-game img{width:105px}.starting-order-player{padding:8px 10px;font-size:12px}}
+@media(max-width:350px){.current-game{grid-template-columns:90px 1fr}.current-game img{width:90px}}
